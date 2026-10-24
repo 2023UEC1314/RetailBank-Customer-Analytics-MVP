@@ -1,0 +1,11 @@
+project: RetailBank-Customer-Analytics
+currency: INR
+day1: 1
+day2: 2
+paths:
+  day1: data/day1
+  day2: data/day2
+  curated: output/curated
+  quarantine: output/quarantine
+  reports: output/reports
+  kpis: output/kpis
