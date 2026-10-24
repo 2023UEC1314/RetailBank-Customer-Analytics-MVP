@@ -805,7 +805,12 @@ def normalize_transaction_dates(df):
     return df
 
 
-def validate_transactions(df):
+def validate_transactions(
+    df,
+    customers=None,
+    products=None,
+    branches=None
+):
     df = normalize_transaction_dates(df)
 
     bad = pd.Series(
@@ -820,7 +825,6 @@ def validate_transactions(df):
     )
 
     if "transaction_id" in df.columns:
-
         bad, reasons = add_reason(
             reasons,
             bad,
@@ -836,7 +840,6 @@ def validate_transactions(df):
         )
 
     if "account_id" in df.columns:
-
         bad, reasons = add_reason(
             reasons,
             bad,
@@ -851,8 +854,22 @@ def validate_transactions(df):
             "MISSING_ACCOUNT_ID"
         )
 
-    if "product_id" in df.columns:
+        if "customer_id" in df.columns:
+         bad, reasons = add_reason(
+            reasons,
+            bad,
+            df["customer_id"].isna()
+            |
+            (
+                df["customer_id"]
+                .astype(str)
+                .str.strip()
+                == ""
+            ),
+            "UNRESOLVED_CUSTOMER_REFERENCE"
+        )    
 
+    if "product_id" in df.columns:
         bad, reasons = add_reason(
             reasons,
             bad,
@@ -868,7 +885,6 @@ def validate_transactions(df):
         )
 
     if "branch_id" in df.columns:
-
         bad, reasons = add_reason(
             reasons,
             bad,
@@ -910,6 +926,88 @@ def validate_transactions(df):
         df["transaction_date"].isna(),
         "INVALID_TRANSACTION_DATE"
     )
+
+    # ---------------------------------------------------------
+    # Referential integrity checks
+    # ---------------------------------------------------------
+
+    if customers is not None and "customer_id" in df.columns:
+
+        valid_customers = set(
+            customers["customer_id"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        missing_customer = (
+            df["customer_id"]
+            .astype(str)
+            .str.strip()
+            .isin(valid_customers)
+            == False
+        )
+
+        missing_customer &= df["customer_id"].notna()
+
+        bad, reasons = add_reason(
+            reasons,
+            bad,
+            missing_customer,
+            "ORPHAN_CUSTOMER_ID"
+        )
+
+    if products is not None and "product_id" in df.columns:
+
+        valid_products = set(
+            products["product_id"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        missing_product = (
+            df["product_id"]
+            .astype(str)
+            .str.strip()
+            .isin(valid_products)
+            == False
+        )
+
+        missing_product &= df["product_id"].notna()
+
+        bad, reasons = add_reason(
+            reasons,
+            bad,
+            missing_product,
+            "ORPHAN_PRODUCT_ID"
+        )
+
+    if branches is not None and "branch_id" in df.columns:
+
+        valid_branches = set(
+            branches["branch_id"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        missing_branch = (
+            df["branch_id"]
+            .astype(str)
+            .str.strip()
+            .isin(valid_branches)
+            == False
+        )
+
+        missing_branch &= df["branch_id"].notna()
+
+        bad, reasons = add_reason(
+            reasons,
+            bad,
+            missing_branch,
+            "ORPHAN_BRANCH_ID"
+        )
 
     df["reason_code"] = reasons
 
@@ -1955,8 +2053,11 @@ def run_day2():
     )
 
     passed, rejected = validate_transactions(
-        incoming
-    )
+    incoming,
+    customers=c,
+    products=p,
+    branches=b
+   )
 
     if not rejected.empty:
 
@@ -2247,4 +2348,3 @@ def run_day2():
 
 if __name__ == "__main__":
     run_day2()
-    
